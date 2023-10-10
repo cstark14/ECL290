@@ -7,9 +7,6 @@ library(shape)
 library(tidyverse)
 library(rethinking)
 
-#### functions from the text/lecture ####
-make_bar <- function(x) paste(rep("#", 20*x), sep = "", collapse = "")
-
 ###sample <- c("W","L","W","W","W","L","W","L","W")
 compute_posterior_sampleList <- function(the_sample,poss=c(0,0.25,0.5,0.75,1)){
   W <- sum(sample=="W") # number of W observed
@@ -18,9 +15,9 @@ compute_posterior_sampleList <- function(the_sample,poss=c(0,0.25,0.5,0.75,1)){
   ways <- sapply( p , function(q) (q*4)^W * ((1-q)*4)^L )
   #prob <- ways/sum(ways)
   post <- ways/sum(ways)
-  #bars <- sapply(post,function(q) make_bar(q))
-  data.frame(poss,ways,post=round(post,3))
-  #data.frame(poss,ways,post=round(post,3),bars)
+  bars <- sapply(post,function(q) make_bar(q))
+  #data.frame(poss,ways,post=round(post,3))
+  data.frame(poss,ways,post=round(post,3),bars)
   #cbind( p , ways , prob )
 }
 
