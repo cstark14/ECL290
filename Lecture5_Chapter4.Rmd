@@ -1,0 +1,130 @@
+---
+title: "Lecture4_Chapter4"
+author: "Cristian Stark"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(coda)
+library(devtools)
+library(loo)
+library(mvtnorm)
+library(dagitty) 
+library(shape)
+library(tidyverse)
+library(rethinking)
+library(DiagrammeR)
+```
+
+## Problem 1: DAG
+```{r}
+mermaid("
+        graph LR
+        A --> H
+        H --> W
+        A -->W
+        ")
+
+```
+
+## Problem 1: Generative sim
+```{r}
+
+simHW <- function(ages,rateAonH=6.5,rateHonW=0.5,rateAonW=0.2){
+  n <- length(ages) ### where ages is a list of ages, n is the number of ages
+  H <- rnorm(n,rateAonH*ages,2) ### H is only affected by A by some factor/rate
+  W <- rnorm(n,rateHonW*H+rateAonW*ages,2)
+  data.frame(ages,H,W)
+}
+simData <- simHW(ages=runif(20,1,12))
+plot(simData$ages,simData$H,lwd=2,col=2)
+plot(simData$H,simData$W,lwd=2,col=2)
+plot(simData$ages,simData$W,lwd=2,col=2)
+```
+## Problem 2 sim for priors
+```{r}
+data(Howell1); d <- Howell1[Howell1$age<13 ,]
+
+n <- 10
+a <- rnorm(n,5,1)
+b <- runif(n,0,10)
+plot( NULL , xlim=range(d$age) , ylim=range(d$weight) ,
+xlab="age" , ylab="weight" )
+for ( i in 1:n ) abline( a[i] , b[i] , lwd=3 , col=2 )
+```
+## Problem 2 modeling
+```{r}
+p2m <- quap(
+  alist(
+    W ~ dnorm(mu,sigma),
+    mu <- a + b*A,
+    a ~ dnorm(5,1),
+    b ~ dunif(0,10),
+    sigma ~ dexp(1)
+  ),data=list(W=d$weight,A=d$age)
+)
+precis(p2m)
+```
+
+## Problem 3 DAG
+```{r}
+mermaid("
+        graph LR
+        A --> H
+        H --> W
+        A --> W
+        S --> H
+        S --> W
+        ")
+```
+
+## Problem 3 Model
+```{r}
+newDataWithS <- list(W=d$weight,A=d$age,S=d$male+1) ### makes males 2 and females 1
+
+p3m <- quap(
+  alist(
+    W ~ dnorm(mu,sigma),
+    mu <- a[S] + b[S]*A,
+    a[S] ~ dnorm(5,1),
+    b[S] ~ dunif(0,10),
+    sigma ~ dexp(1)
+  ),data=newDataWithS
+)
+plot( d$age , d$weight, lwd=3, col=ifelse(d$male==1,4,2) ,xlab="age (years)" , ylab="weight (kg)" )
+```
+
+### Problem 3 Plot with Lines and Intervals/shading
+```{r}
+plot( d$age , d$weight, lwd=3, col=ifelse(d$male==1,4,2) ,xlab="age (years)" , ylab="weight (kg)" )
+ages <- 0:12
+
+### girls
+muG <- link(p3m,data=list(A=ages,S=rep(1,13)))
+shade(apply(muG,2,PI,0.99),ages,col=col.alpha(2,0.5))
+lines(ages,apply(muG,2,mean),lwd=3,col=2)
+
+### boys
+muB <- link(p3m,data=list(A=ages,S=rep(2,13)))
+shade(apply(muB,2,PI,0.99),ages,col=col.alpha(4,0.5))
+lines(ages,apply(muB,2,mean),lwd=3,col=4)
+```
+
+## Problem 3 Contast
+```{r}
+muGpost <- sim(p3m,data=list(A=ages,S=rep(1,13)))
+muBpost <- sim(p3m,data=list(A=ages,S=rep(2,13)))
+
+muPostContrast <- muGpost
+for (i in 1:13){muPostContrast[,i] <- muBpost[,i] - muGpost[,i]}
+
+plot( NULL , xlim=c(0,13) , ylim=c(-15,15) , xlab="age" ,
+ylab="weight difference (boys-girls)" )
+
+for(p in c(0.5,0.67,0.89,0.99)){
+  shade(apply(muPostContrast,2,PI,prob=p),ages)
+}
+```
