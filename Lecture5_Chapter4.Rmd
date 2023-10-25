@@ -17,6 +17,7 @@ library(shape)
 library(tidyverse)
 library(rethinking)
 library(DiagrammeR)
+library(dagitty)
 ```
 
 ## Problem 1: DAG
@@ -26,12 +27,22 @@ mermaid("
         A --> H
         H --> W
         A -->W
+        UH --> H
+        UW --> W
         ")
 
+#### each A,H,W have their own unknowns
 ```
 
 ## Problem 1: Generative sim
 ```{r}
+## A = data (based on Howell1 under age 13)
+## H = AgeFunction(bA+mu, aka mx+b) + UH(rnorm(n,0,10)) ### norm centered around average with sd of 5
+## W = (mu1+bH) + (mu2+bA) + rnorm(n,0,3) ## std of 6kg?
+##### PROBLEM: b is not the same. Looks at units. for H, it's cm per year. for w it's kg per year. mu also same.
+#### only one mu is needed because it's a constant. 
+### W = muW + bWH*H + bWA*A + rnorm(n,0,3)
+
 
 simHW <- function(ages,rateAonH=6.5,rateHonW=0.5,rateAonW=0.2){
   n <- length(ages) ### where ages is a list of ages, n is the number of ages
@@ -46,8 +57,10 @@ plot(simData$ages,simData$W,lwd=2,col=2)
 ```
 ## Problem 2 sim for priors
 ```{r}
+### "Total" only matters if we hadn't made initial DAG
 data(Howell1); d <- Howell1[Howell1$age<13 ,]
 
+### based on answer set.
 n <- 10
 a <- rnorm(n,5,1)
 b <- runif(n,0,10)
@@ -68,6 +81,20 @@ p2m <- quap(
 )
 precis(p2m)
 ```
+## Problem 2 modeling more sensical?
+```{r}
+p2m <- quap(
+  alist(
+    W <- mu + U,
+    U ~ dnorm(0,sigma),
+    mu <- a + b*A,
+    a ~ dnorm(5,1),
+    b ~ dunif(0,10),
+    sigma ~ dexp(1)
+  ),data=list(W=d$weight,A=d$age)
+)
+precis(p2m)
+```
 
 ## Problem 3 DAG
 ```{r}
@@ -79,11 +106,17 @@ mermaid("
         S --> H
         S --> W
         ")
+
+### simplified. W = f(A,S,U) where U is unknowns on W
+##### A is contiguous, S is categorical (1 or 2), and we don't know much on U
+#### W = f(A,S) + U
+#### Given S is categorical, we let A at each category.
+######## two categorical, 4 mu, 1 for each category
 ```
 
 ## Problem 3 Model
 ```{r}
-newDataWithS <- list(W=d$weight,A=d$age,S=d$male+1) ### makes males 2 and females 1
+newDataWithS <- list(W=d$weight,A=d$age,S=d$male+1) ### makes males 2 and females 1, so there's no 0.
 
 p3m <- quap(
   alist(
