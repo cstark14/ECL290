@@ -37,16 +37,84 @@ X -> Z -> Y
      A
 ``` 
 
-## 
+## Wk 4 Problem 1
 ```{r}
+d <- sim_happiness( seed=1977 , N_years=1000 )
+d2 <- d[ d$age>17 , ] # only adults
+d2$A <- ( d2$age - 18 ) / ( 65 - 18 )
+d2$mid <- d2$married + 1
 
+m6.9 <- quap(
+  alist(
+    happiness ~ dnorm( mu , sigma ),
+    mu <- a[mid] + bA*A,
+    a[mid] ~ dnorm( 0 , 1 ),
+    bA ~ dnorm( 0 , 2 ),
+    sigma ~ dexp(1)
+  ) , data=d2 )
+m6.10 <- quap(
+  alist(
+    happiness ~ dnorm( mu , sigma ),
+    mu <- a + bA*A,
+    a ~ dnorm( 0 , 1 ),
+    bA ~ dnorm( 0 , 2 ),
+    sigma ~ dexp(1)
+  ) , data=d2 )
 
+compare(m6.9,m6.10,func=PSIS)
 
 ```
 
-## 
+## Week 4 Problem 2
 ```{r}
+#### FGW or FG
+data(foxes)
+foxesStd <- list(af=standardize(foxes$avgfood),
+                 G=standardize(foxes$groupsize),
+                 A=standardize(foxes$area),
+                 W=standardize(foxes$weight))
+mFW <- quap(
+  alist(
+    W ~ dnorm(mu,sigma),
+    mu <- a + bF*af,
+    a ~ dnorm(0,0.2),
+    bF ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ),data=foxesStd
+)
 
+mFWNoG <- quap(
+  alist(
+    W ~ dnorm(mu,sigma),
+    mu <- a + bF*af + bG*G,
+    a ~ dnorm(0,0.2),
+    bF ~ dnorm(0,0.5),
+    bG ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ),data=foxesStd
+)
+
+mAFG_W <- quap(
+  alist(
+    W ~ dnorm( mu , sigma ),
+    mu <- a + bF*af + bG*G + bA*A,
+    a ~ dnorm(0,0.2),
+    c(bF,bG,bA) ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ), data=foxesStd )
+
+mFG_W <- quap(
+  alist(
+    W ~ dnorm( mu , sigma ),
+    mu <- a + baf*af + bG*G,
+    a ~ dnorm(0,0.2),
+    c(baf,bG) ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ), data=foxesStd )
+
+compare( mFW , mFWNoG, mFG_W, mAFG_W, func=PSIS )
+
+#### Higher error likely comes from variability of data with more variables in the model. Model changes a lot more each time
 
 ```
 ## 
