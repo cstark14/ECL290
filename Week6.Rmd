@@ -1,0 +1,61 @@
+---
+title: "Lecture4_Chapter4"
+author: "Cristian Stark"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(coda)
+library(devtools)
+library(loo)
+library(mvtnorm)
+library(dagitty) 
+library(shape)
+library(tidyverse)
+library(rethinking)
+library(DiagrammeR)
+library(dagitty)
+```
+
+## Info:
+```{r}
+## Fork (Earth)
+X <- Z -> Y
+
+## Pipe (Water)
+X -> Z -> Y
+
+## Collider (Fire)
+X -> Z <- Y
+
+## Descendant (Air)
+X -> Z -> Y
+     |
+     A
+``` 
+
+## 
+```{r}
+
+
+
+```
+
+## 
+```{r}
+
+
+```
+## 
+```{r}
+
+```
+
+## 
+```{r}
+
+
+```

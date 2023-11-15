@@ -89,7 +89,10 @@ hist(predictionsA1-predictionsA0)
 
 ## Problem 3:
 ```{r}
+#### Scientifically, think about if food is low and group size goes low to high, whats impact on weight
+####### then low group, low food to high food
 
+### The below is simplified in which F and G are independent which Dan thinks is wrong, it probably is
 mFWNoG <- quap(
   alist(
     W ~ dnorm(mu,sigma),
@@ -101,9 +104,8 @@ mFWNoG <- quap(
   ),data=dlist
 )
 plot(precis(mFWNoG))
-prior_samples = extract.prior(mFWNoG,n=20)
-plot(NA,NA,xlim=range(foxes$avgfood),ylim=range(foxes$weight))
-for (i in 1:20)abline(prior_samples$a[i],prior_samples$bF[i],col=1)
-post_samples = extract.samples(mFWNoG,n=20)
-#for(i in 1:20) abline(post_samples$a[i],post_samples$bF[i],col=2)
+
+### To make sense, subtracting Food from G makes sense IF they are correlated. It looks like positive correlation
+#### Adding food to system, increases group size keeping weight the same
+
 ```
