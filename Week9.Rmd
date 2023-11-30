@@ -1,0 +1,193 @@
+---
+title: "Lecture4_Chapter4"
+author: "Cristian Stark"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(coda)
+library(devtools)
+library(loo)
+library(mvtnorm)
+library(dagitty) 
+library(shape)
+library(tidyverse)
+library(rethinking)
+library(DiagrammeR)
+library(dagitty)
+```
+
+## Info:
+```{r}
+## Fork (Earth)
+#X <- Z -> Y
+fork <- dagitty("dag{Z-> X Z->Y}")
+#plot(fork)
+
+## Pipe (Water)
+#X -> Z -> Y
+pipe <- dagitty("dag{X -> Z -> Y}")
+
+## Collider (Fire)
+#X -> Z <- Y
+collider <- dagitty("dag{X -> Z <- Y}")
+
+## Descendant (Air)
+#X -> Z -> Y
+#     |
+#     A
+descendant <- dagitty("dag{X -> Z -> Y Z->A}")
+plot(descendant)
+``` 
+
+## Wk 4 Problem 1
+```{r}
+d <- sim_happiness( seed=1977 , N_years=1000 )
+d2 <- d[ d$age>17 , ] # only adults
+d2$A <- ( d2$age - 18 ) / ( 65 - 18 )
+d2$mid <- d2$married + 1
+
+m6.9 <- quap(
+  alist(
+    happiness ~ dnorm( mu , sigma ),
+    mu <- a[mid] + bA*A,
+    a[mid] ~ dnorm( 0 , 1 ),
+    bA ~ dnorm( 0 , 2 ),
+    sigma ~ dexp(1)
+  ) , data=d2 )
+m6.10 <- quap(
+  alist(
+    happiness ~ dnorm( mu , sigma ),
+    mu <- a + bA*A,
+    a ~ dnorm( 0 , 1 ),
+    bA ~ dnorm( 0 , 2 ),
+    sigma ~ dexp(1)
+  ) , data=d2 )
+
+compare(m6.9,m6.10,func=PSIS)
+
+```
+
+## Week 4 Problem 2
+```{r}
+#### FGW or FG
+data(foxes)
+foxesStd <- list(af=standardize(foxes$avgfood),
+                 G=standardize(foxes$groupsize),
+                 A=standardize(foxes$area),
+                 W=standardize(foxes$weight))
+mFW <- quap(
+  alist(
+    W ~ dnorm(mu,sigma),
+    mu <- a + bF*af,
+    a ~ dnorm(0,0.2),
+    bF ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ),data=foxesStd
+)
+####
+uFW <- ulam(
+  alist(
+    W ~ dnorm(mu,sigma),
+    mu <- a + bF*af,
+    a ~ dnorm(0,0.2),
+    bF ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ),data=foxesStd,chains=4 , cores=4
+)
+
+mFWNoG <- quap(
+  alist(
+    W ~ dnorm(mu,sigma),
+    mu <- a + bF*af + bG*G,
+    a ~ dnorm(0,0.2),
+    bF ~ dnorm(0,0.5),
+    bG ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ),data=foxesStd
+)
+
+mAFG_W <- quap(
+  alist(
+    W ~ dnorm( mu , sigma ),
+    mu <- a + bF*af + bG*G + bA*A,
+    a ~ dnorm(0,0.2),
+    c(bF,bG,bA) ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ), data=foxesStd )
+
+mFG_W <- quap(
+  alist(
+    W ~ dnorm( mu , sigma ),
+    mu <- a + baf*af + bG*G,
+    a ~ dnorm(0,0.2),
+    c(baf,bG) ~ dnorm(0,0.5),
+    sigma ~ dexp(1)
+  ), data=foxesStd )
+
+#compare( mFW , mFWNoG, mFG_W, mAFG_W, func=PSIS )
+precis(uFW,2)
+### rhat 1.1 is the limit, 1.2 is bad
+#compare(mFW, uFW,func=PSIS)
+#### Higher error likely comes from variability of data with more variables in the model. Model changes a lot more each time
+
+```
+## 
+```{r}
+precis(mFW)
+```
+
+## 
+```{r}
+traceplot(uFW)
+```
+
+## Week 4 problem 3 cherry data
+```{r}
+### Predict doy with temp
+library(splines)
+data("cherry_blossoms")
+cherry_blossoms <- cherry_blossoms[complete.cases(cherry_blossoms$doy,cherry_blossoms$temp),]
+cherryStd <- list(Y = cherry_blossoms$year,
+                  D = cherry_blossoms$doy,
+                  t = standardize(cherry_blossoms$temp),
+                  tU = standardize(cherry_blossoms$temp_upper),
+                  tL = standardize(cherry_blossoms$temp_lower))
+mTD_l <- ulam(
+  alist(
+    D ~ dnorm( mu , sigma ),
+    mu <- a + bt*t,
+    a ~ dnorm(0,10),
+    bt ~ dnorm(0,10),
+    sigma ~ dexp(1)
+  ),data=cherryStd,chains = 4,cores = 4
+)
+
+
+num_knots = 5
+knot_list <- quantile( cherryStd$D , probs=seq(0,1,length.out=num_knots) )
+B <- bs(cherryStd$t,knots=knot_list[-c(1,num_knots)] ,degree=3 , intercept=TRUE )
+
+mTD_s <- quap(
+  alist(
+    D ~ dnorm( mu , sigma ) ,
+    mu <- a + B %*% w ,
+    a ~ dnorm(100,10),
+    w ~ dnorm(0,10),
+    sigma ~ dexp(1)
+  ), data=list(D=cherryStd$D,B=B), start=list( w=rep( 0 , ncol(B) ) ) )
+# mTD_s <- quap(
+#   alist(
+#     W ~ dnorm( mu , sigma ),
+#     mu <- a + baf*af + bG*G,
+#     a ~ dnorm(0,0.2),
+#     c(baf,bG) ~ dnorm(0,0.5),
+#     sigma ~ dexp(1)
+#   )
+# )
+precis(mTD_l,2)
+#precis(mTD_s,2)
+```
